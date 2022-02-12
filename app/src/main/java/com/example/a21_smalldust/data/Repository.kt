@@ -1,6 +1,7 @@
 package com.example.a21_smalldust.data
 
 import com.example.a21_smalldust.BuildConfig
+import com.example.a21_smalldust.data.models.airquality.MeasuredValue
 import com.example.a21_smalldust.data.models.monitoringstation.MonitoringStation
 import com.example.a21_smalldust.data.services.AirKoreaApiService
 import com.example.a21_smalldust.data.services.KakaoLocalApiService
@@ -32,6 +33,15 @@ object Repository {
             ?.minByOrNull { it.tm ?: Double.MAX_VALUE }
 
     }
+
+    suspend fun getLatestAirQualityData(stationName: String): MeasuredValue? =
+        airKoreaApiService
+            .getRealtimeAirQualities(stationName)
+            .body()
+            ?.response
+            ?.body
+            ?.measuredValues
+            ?.firstOrNull()
 
     private val kakaoLocalApiService:KakaoLocalApiService by lazy {
         Retrofit.Builder()
