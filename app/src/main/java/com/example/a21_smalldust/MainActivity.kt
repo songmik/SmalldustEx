@@ -2,6 +2,7 @@ package com.example.a21_smalldust
 
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.View
@@ -55,72 +56,95 @@ class MainActivity : AppCompatActivity() {
             requestCode == REQUEST_ACCESS_LOCATION_PERMISSIONS &&
                     grantResults[0] == PackageManager.PERMISSION_GRANTED
 
-        if (!locationPermissionGranted) {
-            finish()
+        val backgroundLocationPermissionGranted =
+            requestCode == REQUEST_ACCESS_LOCATION_PERMISSIONS &&
+                    grantResults[0] == PackageManager.PERMISSION_GRANTED
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!backgroundLocationPermissionGranted) {
+                requestBackgroundLocationPermissions()
+            } else {
+                fetchAirQualityData()
+            }
         } else {
-            fetchAirQualityData()
+            if (!locationPermissionGranted) {
+                finish()
+            } else {
+                fetchAirQualityData()
+            }
+        }
         }
 
-    }
-
-    private fun bindViews(){
-        binding.refresh.setOnRefreshListener {
-            fetchAirQualityData()
+        private fun bindViews() {
+            binding.refresh.setOnRefreshListener {
+                fetchAirQualityData()
+            }
         }
-    }
 
-    private fun initVariables() {
-        fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
+        private fun initVariables() {
+            fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
 
-    }
+        }
 
-    private fun requestLocationPermissions() {
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(
-                android.Manifest.permission.ACCESS_COARSE_LOCATION,
-                android.Manifest.permission.ACCESS_FINE_LOCATION
-            ),
-            REQUEST_ACCESS_LOCATION_PERMISSIONS
-        )
-    }
+        private fun requestLocationPermissions() {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                    android.Manifest.permission.ACCESS_FINE_LOCATION
+                ),
+                REQUEST_ACCESS_LOCATION_PERMISSIONS
+            )
+        }
 
-    @SuppressLint("MissingPermission")
-    private fun fetchAirQualityData() {
-        cancellationTokenSource = CancellationTokenSource()
+        @SuppressLint("InlinedApi")
+        private fun requestBackgroundLocationPermissions() {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION),
+                REQUEST_BACKGROUND_ACCESS_LOCATION_PERMISSIONS
+            )
+        }
 
-        fusedLocationProviderClient
-            .getCurrentLocation(
-                LocationRequest.PRIORITY_HIGH_ACCURACY,
-                cancellationTokenSource!!.token
-            ).addOnSuccessListener { location ->
-                scope.launch {
-                    binding.errorDescriptionTextView.visibility = View.GONE
-                    try {
-                        val monitoringStation = Repository.getNearbyMonitoringStation(
-                            location.latitude,
-                            location.longitude
-                        )
-                        val measuredValue =
-                            Repository.getLatestAirQualityData(monitoringStation!!.stationName!!)
+        @SuppressLint("MissingPermission")
+        private fun fetchAirQualityData() {
+            cancellationTokenSource = CancellationTokenSource()
 
-                        displayAirQualityData(monitoringStation, measuredValue!!)
+            fusedLocationProviderClient
+                .getCurrentLocation(
+                    LocationRequest.PRIORITY_HIGH_ACCURACY,
+                    cancellationTokenSource!!.token
+                ).addOnSuccessListener { location ->
+                    scope.launch {
+                        binding.errorDescriptionTextView.visibility = View.GONE
+                        try {
+                            val monitoringStation = Repository.getNearbyMonitoringStation(
+                                location.latitude,
+                                location.longitude
+                            )
+                            val measuredValue =
+                                Repository.getLatestAirQualityData(monitoringStation!!.stationName!!)
 
-                    } catch (e: Exception) {
-                        binding.errorDescriptionTextView.visibility = View.VISIBLE
-                        binding.contentsLayout.alpha = 0F
-                    } finally {
-                        binding.progressBar.visibility = View.GONE
-                        binding.refresh.isRefreshing = false
+                            displayAirQualityData(monitoringStation, measuredValue!!)
+
+                        } catch (e: Exception) {
+                            binding.errorDescriptionTextView.visibility = View.VISIBLE
+                            binding.contentsLayout.alpha = 0F
+                        } finally {
+                            binding.progressBar.visibility = View.GONE
+                            binding.refresh.isRefreshing = false
+                        }
+
                     }
 
                 }
-
-            }
-    }
+        }
 
         @SuppressLint("SetTextI18n")
-        fun displayAirQualityData(monitoringStation: MonitoringStation, measuredValue: MeasuredValue) {
+        fun displayAirQualityData(
+            monitoringStation: MonitoringStation,
+            measuredValue: MeasuredValue
+        ) {
             binding.contentsLayout.animate()
                 .alpha(1F)
                 .start()
@@ -167,5 +191,6 @@ class MainActivity : AppCompatActivity() {
 
         companion object {
             private const val REQUEST_ACCESS_LOCATION_PERMISSIONS = 100
+            private const val REQUEST_BACKGROUND_ACCESS_LOCATION_PERMISSIONS = 100
         }
     }
